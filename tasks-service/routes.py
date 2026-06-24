@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from auth_shared import AuthContext, require_auth
 from clients import notify_task_completed
 from models import Tarea, get_session
 
@@ -39,8 +40,12 @@ class TaskOut(BaseModel):
 
 # --- Endpoints ----------------------------------------------------------------
 @router.post("", response_model=TaskOut, status_code=status.HTTP_201_CREATED)
-def create_task(payload: TaskCreate, db: Session = Depends(get_session)) -> Tarea:
-    """Crea una nueva tarea en estado 'pendiente'."""
+def create_task(
+    payload: TaskCreate,
+    db: Session = Depends(get_session),
+    auth: AuthContext = Depends(require_auth),
+) -> Tarea:
+    """Crea una nueva tarea en estado 'pendiente'. Requiere autenticación."""
     tarea = Tarea(titulo=payload.titulo, user_id=payload.user_id, estado="pendiente")
     db.add(tarea)
     db.commit()
@@ -56,7 +61,10 @@ def list_tasks(db: Session = Depends(get_session)) -> list[Tarea]:
 
 @router.put("/{task_id}/complete", response_model=TaskOut)
 def complete_task(
-    task_id: int, response: Response, db: Session = Depends(get_session)
+    task_id: int,
+    response: Response,
+    db: Session = Depends(get_session),
+    auth: AuthContext = Depends(require_auth),
 ) -> Tarea:
     """Marca una tarea como completada y notifica al notifications-service.
 
@@ -84,6 +92,7 @@ def complete_task(
     notified = notify_task_completed(
         task_id=tarea.id,
         mensaje=f"La tarea '{tarea.titulo}' se ha marcado como completada.",
+        auth_token=auth.token,  # Token Forwarding: reenviamos el JWT del cliente
     )
 
     if not notified:

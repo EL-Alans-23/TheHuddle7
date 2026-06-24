@@ -42,7 +42,7 @@ class Settings:
     # Seguridad JWT compartida (users-service es quien FIRMA los tokens)
     JWT_SECRET: str = _required("JWT_SECRET")
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
-    JWT_EXPIRATION_MINUTES: int = int(os.getenv("JWT_EXPIRATION_MINUTES", "60"))
+    JWT_EXPIRATION_MINUTES: int = int(os.getenv("JWT_EXPIRATION_MINUTES", "120"))
 
 
 @lru_cache

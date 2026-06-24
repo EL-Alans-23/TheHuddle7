@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from auth_shared import AuthContext, require_auth
 from models import HistorialAlerta, get_session
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
@@ -40,7 +41,9 @@ class NotificationOut(BaseModel):
 # --- Endpoints ----------------------------------------------------------------
 @router.post("", response_model=NotificationOut, status_code=status.HTTP_201_CREATED)
 def send_notification(
-    payload: NotificationCreate, db: Session = Depends(get_session)
+    payload: NotificationCreate,
+    db: Session = Depends(get_session),
+    auth: AuthContext = Depends(require_auth),
 ) -> HistorialAlerta:
     """Simula el envío de una notificación y la guarda en el historial.
 

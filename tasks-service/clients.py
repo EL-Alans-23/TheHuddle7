@@ -18,7 +18,9 @@ BACKOFF_SECONDS = 1.0  # espera base; crece linealmente con cada intento
 REQUEST_TIMEOUT = 5.0  # segundos máximos por intento
 
 
-def notify_task_completed(task_id: int, mensaje: str) -> bool:
+def notify_task_completed(
+    task_id: int, mensaje: str, auth_token: str | None = None
+) -> bool:
     """Avisa al notifications-service de que una tarea se completó.
 
     Implementa un patrón de Retry: hasta MAX_RETRIES intentos ante fallos de red
@@ -26,15 +28,22 @@ def notify_task_completed(task_id: int, mensaje: str) -> bool:
         True  -> la notificación se entregó correctamente.
         False -> se agotaron los reintentos (el llamador decide cómo degradar).
 
+    Token Forwarding: si se recibe `auth_token` (el JWT del cliente original),
+    se reenvía en el header 'Authorization' para que el notifications-service,
+    que también está protegido, acepte la petición.
+
     NUNCA propaga la excepción: la resiliencia consiste precisamente en que el
     fallo de un servicio dependiente no haga fallar a tasks-service.
     """
     url = f"{settings.NOTIFICATIONS_SERVICE_URL}/notifications"
     payload = {"task_id": task_id, "mensaje": mensaje}
+    headers = {"Authorization": f"Bearer {auth_token}"} if auth_token else {}
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            response = httpx.post(url, json=payload, timeout=REQUEST_TIMEOUT)
+            response = httpx.post(
+                url, json=payload, headers=headers, timeout=REQUEST_TIMEOUT
+            )
 
             # Un 5xx es un fallo del lado del servidor: merece reintento.
             if response.status_code >= 500:

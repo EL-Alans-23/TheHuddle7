@@ -1,0 +1,130 @@
+# ==============================================================================
+# Gestor de Tareas — Orquestación del ecosistema de microservicios
+# ------------------------------------------------------------------------------
+# Levanta 3 bases de datos PostgreSQL INDEPENDIENTES (Database per Service) y los
+# 3 microservicios, todos en una red interna privada.
+#
+#   docker compose up --build
+#
+# El JWT_SECRET se toma del archivo .env de la raíz (env_file). Las URLs de BD y
+# de servicios se SOBREESCRIBEN aquí para usar los nombres de red de Docker
+# (p. ej. users-db) en lugar de localhost.
+# ==============================================================================
+
+name: gestor-de-tareas
+
+# --- Red interna privada compartida por todos los contenedores ---
+networks:
+  backend-network:
+    driver: bridge
+
+# --- Volúmenes persistentes: uno por base de datos ---
+volumes:
+  users-db-data:
+  tasks-db-data:
+  notifications-db-data:
+
+services:
+  # ===========================================================================
+  # BASES DE DATOS (una por servicio, aisladas)
+  # ===========================================================================
+  users-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: huddle
+      POSTGRES_PASSWORD: huddle
+      POSTGRES_DB: users_db
+    volumes:
+      - users-db-data:/var/lib/postgresql/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U huddle -d users_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  tasks-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: huddle
+      POSTGRES_PASSWORD: huddle
+      POSTGRES_DB: tasks_db
+    volumes:
+      - tasks-db-data:/var/lib/postgresql/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U huddle -d tasks_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  notifications-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: huddle
+      POSTGRES_PASSWORD: huddle
+      POSTGRES_DB: notifications_db
+    volumes:
+      - notifications-db-data:/var/lib/postgresql/data
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U huddle -d notifications_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ===========================================================================
+  # MICROSERVICIOS
+  # ===========================================================================
+  users-service:
+    build: ./users-service
+    env_file:
+      - .env                      # aporta JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRATION_MINUTES
+    environment:
+      # Sobreescribe la URL para apuntar a la BD por su nombre de red.
+      USERS_DATABASE_URL: postgresql://huddle:huddle@users-db:5432/users_db
+      USERS_SERVICE_PORT: 5001
+    ports:
+      - "5001:5001"
+    depends_on:
+      users-db:
+        condition: service_healthy
+    networks:
+      - backend-network
+
+  tasks-service:
+    build: ./tasks-service
+    env_file:
+      - .env
+    environment:
+      TASKS_DATABASE_URL: postgresql://huddle:huddle@tasks-db:5432/tasks_db
+      TASKS_SERVICE_PORT: 5002
+      # Comunicación entre servicios por nombre de red, no localhost.
+      NOTIFICATIONS_SERVICE_URL: http://notifications-service:5003
+    ports:
+      - "5002:5002"
+    depends_on:
+      tasks-db:
+        condition: service_healthy
+      notifications-service:
+        condition: service_started
+    networks:
+      - backend-network
+
+  notifications-service:
+    build: ./notifications-service
+    env_file:
+      - .env
+    environment:
+      NOTIFICATIONS_DATABASE_URL: postgresql://huddle:huddle@notifications-db:5432/notifications_db
+      NOTIFICATIONS_SERVICE_PORT: 5003
+    ports:
+      - "5003:5003"
+    depends_on:
+      notifications-db:
+        condition: service_healthy
+    networks:
+      - backend-network

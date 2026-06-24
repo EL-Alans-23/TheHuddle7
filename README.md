@@ -21,33 +21,69 @@ TheHuddle7/
 ├── .env                      # Variables de entorno (NO versionado)
 ├── .env.example              # Plantilla de variables
 ├── .gitignore
+├── docker-compose.yml        # Orquesta 3 BD + 3 servicios en red privada
 ├── README.md
 ├── users-service/
-│   ├── app.py
-│   ├── config.py
+│   ├── Dockerfile
+│   ├── app.py · config.py · models.py · routes.py
+│   ├── auth_routes.py        # POST /auth/login (emite JWT)
+│   ├── auth_shared.py        # verificación JWT (módulo compartido)
 │   └── requirements.txt
 ├── tasks-service/
-│   ├── app.py
-│   ├── config.py
+│   ├── Dockerfile
+│   ├── app.py · config.py · models.py · routes.py
+│   ├── clients.py            # cliente HTTP resiliente + token forwarding
+│   ├── auth_shared.py
 │   └── requirements.txt
 └── notifications-service/
-    ├── app.py
-    ├── config.py
+    ├── Dockerfile
+    ├── app.py · config.py · models.py · routes.py
+    ├── auth_shared.py
     └── requirements.txt
 ```
 
-## Puesta en marcha (desarrollo)
+## Puesta en marcha con Docker (recomendado)
+
+Levanta las 3 bases de datos y los 3 servicios con un solo comando:
 
 ```bash
-# 1. Configurar variables de entorno
-cp .env.example .env   # y rellenar los valores
+cp .env.example .env        # y rellenar JWT_SECRET (genéralo aleatorio)
+docker compose up --build
+```
 
-# 2. Por cada servicio (ejemplo: users-service)
+Servicios disponibles en `localhost:5001` / `5002` / `5003`. Docs OpenAPI en
+`/docs` de cada uno (p. ej. http://localhost:5001/docs).
+
+## Puesta en marcha manual (sin Docker)
+
+```bash
+cp .env.example .env        # apuntar las *_DATABASE_URL a tus PostgreSQL locales
+
+# Por cada servicio (ejemplo: users-service)
 cd users-service
 python -m venv .venv && source .venv/bin/activate   # En Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn app:app --reload --port 5001
+python app.py
 ```
 
-> **Paso 1 actual:** solo estructura y configuración base. La lógica de base de
-> datos y los endpoints se añadirán en pasos posteriores.
+## Flujo de uso (end-to-end)
+
+```bash
+# 1. Registrar un usuario
+curl -X POST localhost:5001/users -H "Content-Type: application/json" \
+  -d '{"username":"ana","password":"secreto123","rol":"user"}'
+
+# 2. Login -> obtener el JWT (válido 2h)
+TOKEN=$(curl -s -X POST localhost:5001/auth/login -H "Content-Type: application/json" \
+  -d '{"username":"ana","password":"secreto123"}' | python -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+
+# 3. Crear una tarea (requiere Bearer)
+curl -X POST localhost:5002/tasks -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" -d '{"titulo":"Mi tarea","user_id":1}'
+
+# 4. Completar la tarea -> notifica al notifications-service (token forwarding)
+curl -X PUT localhost:5002/tasks/1/complete -H "Authorization: Bearer $TOKEN"
+
+# 5. Ver el historial de notificaciones
+curl localhost:5003/notifications
+```

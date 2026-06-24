@@ -33,7 +33,7 @@ class Settings:
     SERVICE_NAME: str = "tasks-service"
 
     # Servidor
-    PORT: int = int(os.getenv("TASKS_SERVICE_PORT", "8002"))
+    PORT: int = int(os.getenv("TASKS_SERVICE_PORT", "5002"))
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 
     # Base de datos independiente de este microservicio

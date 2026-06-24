@@ -33,7 +33,7 @@ class Settings:
     SERVICE_NAME: str = "notifications-service"
 
     # Servidor
-    PORT: int = int(os.getenv("NOTIFICATIONS_SERVICE_PORT", "8003"))
+    PORT: int = int(os.getenv("NOTIFICATIONS_SERVICE_PORT", "5003"))
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 
     # Base de datos independiente de este microservicio

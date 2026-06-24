@@ -10,6 +10,7 @@ from fastapi import FastAPI
 
 from config import get_settings
 from models import init_db
+from routes import router as users_router
 
 settings = get_settings()
 
@@ -27,6 +28,8 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+app.include_router(users_router)
 
 
 @app.get("/health", tags=["health"])

@@ -6,9 +6,9 @@ Ecosistema de microservicios en Python (FastAPI) para la gestión de tareas.
 
 | Servicio                 | Puerto | Base de datos       | Responsabilidad                          |
 |--------------------------|--------|---------------------|------------------------------------------|
-| `users-service`          | 8001   | `users_db`          | Registro, autenticación y emisión de JWT |
-| `tasks-service`          | 8002   | `tasks_db`          | CRUD de tareas, asignaciones, estados    |
-| `notifications-service`  | 8003   | `notifications_db`  | Envío y registro de notificaciones       |
+| `users-service`          | 5001   | `users_db`          | Registro, autenticación y emisión de JWT |
+| `tasks-service`          | 5002   | `tasks_db`          | CRUD de tareas, asignaciones, estados    |
+| `notifications-service`  | 5003   | `notifications_db`  | Envío y registro de notificaciones       |
 
 Cada servicio es **independiente**: tiene su propia base de datos y su propio
 ciclo de despliegue. El secreto `JWT_SECRET` es el único contrato de seguridad
@@ -46,7 +46,7 @@ cp .env.example .env   # y rellenar los valores
 cd users-service
 python -m venv .venv && source .venv/bin/activate   # En Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn app:app --reload --port 8001
+uvicorn app:app --reload --port 5001
 ```
 
 > **Paso 1 actual:** solo estructura y configuración base. La lógica de base de

@@ -33,7 +33,7 @@ class Settings:
     SERVICE_NAME: str = "users-service"
 
     # Servidor
-    PORT: int = int(os.getenv("USERS_SERVICE_PORT", "8001"))
+    PORT: int = int(os.getenv("USERS_SERVICE_PORT", "5001"))
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 
     # Base de datos independiente de este microservicio

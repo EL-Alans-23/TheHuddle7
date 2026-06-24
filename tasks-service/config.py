@@ -43,6 +43,11 @@ class Settings:
     JWT_SECRET: str = _required("JWT_SECRET")
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
 
+    # Comunicación entre servicios: a quién avisamos al completar una tarea
+    NOTIFICATIONS_SERVICE_URL: str = os.getenv(
+        "NOTIFICATIONS_SERVICE_URL", "http://localhost:5003"
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

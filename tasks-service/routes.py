@@ -6,11 +6,12 @@ Endpoints:
     PUT  /tasks/{id}/complete -> marca una tarea como completada.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from clients import notify_task_completed
 from models import Tarea, get_session
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -54,15 +55,39 @@ def list_tasks(db: Session = Depends(get_session)) -> list[Tarea]:
 
 
 @router.put("/{task_id}/complete", response_model=TaskOut)
-def complete_task(task_id: int, db: Session = Depends(get_session)) -> Tarea:
-    """Marca una tarea como completada."""
+def complete_task(
+    task_id: int, response: Response, db: Session = Depends(get_session)
+) -> Tarea:
+    """Marca una tarea como completada y notifica al notifications-service.
+
+    Comportamiento resiliente:
+      - La fuente de verdad es la BD local: primero se persiste 'completada'.
+      - Después se intenta notificar (con reintentos en el cliente HTTP).
+      - Si la notificación se entrega    -> 200 OK.
+      - Si la notificación falla del todo -> 202 Accepted (tarea completada
+        localmente, notificación diferida/fallida). La operación principal NO
+        se revierte ni falla por culpa de un servicio dependiente.
+    """
     tarea = db.get(Tarea, task_id)
     if tarea is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tarea no encontrada.",
         )
+
+    # 1) Persistimos el cambio de estado (operación principal, transaccional).
     tarea.estado = "completada"
     db.commit()
     db.refresh(tarea)
+
+    # 2) Efecto secundario tolerante a fallos: avisar a notifications-service.
+    notified = notify_task_completed(
+        task_id=tarea.id,
+        mensaje=f"La tarea '{tarea.titulo}' se ha marcado como completada.",
+    )
+
+    if not notified:
+        # La tarea está completada, pero la notificación quedó diferida.
+        response.status_code = status.HTTP_202_ACCEPTED
+
     return tarea
